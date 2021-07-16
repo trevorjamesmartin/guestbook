@@ -26,11 +26,15 @@
 (defn about-page [request]
   (layout/render request "about.html"))
 
+(defn message-list [_]
+  (response/ok {:messages (vec (db/get-messages))}))
+
 (defn home-routes []
   [""
    {:middleware [middleware/wrap-csrf
                  middleware/wrap-formats]}
    ["/" {:get home-page}]
+   ["/messages" {:get message-list}]
    ["/message" {:post save-message!}]
    ["/about" {:get about-page}]])
 
