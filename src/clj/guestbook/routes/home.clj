@@ -6,18 +6,7 @@
    [guestbook.middleware :as middleware]
    [ring.util.response]
    [ring.util.http-response :as response]
-   [struct.core :as st]))
-
-(def message-schema
-  [[:name
-    st/required
-    st/string]
-   [:message
-    st/required
-    st/string]])
-
-(defn validate-message [params]
-  (first (st/validate params message-schema)))
+   [guestbook.validation :refer [validate-message]]))
 
 (defn save-message! [{:keys [params]}]
   (if-let [errors (validate-message params)]
@@ -28,16 +17,6 @@
       (catch Exception e
         (response/internal-server-error
          {:errors {:server-error ["Failed to save message!"]}})))))
-
-
-
-    ;; (-> (response/found "/")
-
-    ;;     (assoc :flash (assoc params :errors errors)))
-    ;; (do
-    ;;   (db/save-message! params)
-    ;;   (response/found "/"))))
-
 
 (defn home-page [{:keys [flash] :as request}]
   (layout/render
