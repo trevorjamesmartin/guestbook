@@ -18,12 +18,10 @@
         (response/internal-server-error
          {:errors {:server-error ["Failed to save message!"]}})))))
 
-(defn home-page [{:keys [flash] :as request}]
+(defn home-page [request]
   (layout/render
    request
-   "home.html"
-   (merge {:messages (db/get-messages)}
-          (select-keys flash [:name :message :errors]))))
+   "home.html"))
 
 (defn about-page [request]
   (layout/render request "about.html"))
