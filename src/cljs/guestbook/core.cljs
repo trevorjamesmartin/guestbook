@@ -1,6 +1,5 @@
 (ns guestbook.core
-  (:require [reagent.core :as r]
-            [reagent.dom :as dom]
+  (:require [reagent.dom :as dom]
             [re-frame.core :as rf]
             [ajax.core :refer [GET POST]]
             [clojure.string :as string]
@@ -136,61 +135,40 @@
       [:p message]
       [:p " - " name]])])
 
-;; (defn send-message! [fields errors]
-;;   (if-let [validation-errors (validate-message @fields)]
-;;     (reset! errors validation-errors)
-;;     (POST "/api/message"
-;;       {:format :json
-;;        :headers
-;;        {"Accept" "application/transit+json"
-;;         "x-csrf-token" (.-value (.getElementById js/document "token"))}
-;;        :params @fields
-;;        :handler (fn [_]
-;;                   (rf/dispatch
-;;                    [:message/add (assoc @fields :timestamp (js/Date.))])
-;;                   (reset! fields nil)
-;;                   (reset! errors nil))
-;;        :error-handler (fn [e]
-;;                         (.log js/console (str e))
-;;                         (reset! errors (-> e :response :errors)))})))
-
 (defn errors-component [id]
   (when-let [error @(rf/subscribe [:form/error id])]
     [:div.notifications.is-danger (string/join error)]))
 
 (defn message-form []
-  (let [fields (r/atom {})
-        errors (r/atom nil)]
-    (fn []
-      [:div
-       [errors-component errors :server-error]
-       [:div.field
-        [:label.label {:for :name} "Name"]
-        [errors-component errors :name]
-        [:input.input
-         {:type :text
-          :name :name
-          :on-change #(rf/dispatch
-                       [:form/set-field
-                        :name
-                        (.. % -target -value)])
-          :value @(rf/subscribe [:form/field :name])}]]
-       [:div.field
-        [:label.label (:for :message) "Message"]
-        [errors-component errors :message]
-        [:textarea.textarea
-         {:name :message
-          :value @(rf/subscribe [:form/field :message])
-          :on-change #(rf/dispatch
-                       [:form/set-field
-                        :message
-                        (.. % -target -value)])}]]
-       [:input.button.is-primary
-        {:type :submit
-         :disabled @(rf/subscribe [:form/validation-errors?])
-         :on-click #(rf/dispatch [:message/send!
-                                  @(rf/subscribe [:form/fields])])
-         :value "comment"}]])))
+  [:div
+   [errors-component :server-error]
+   [:div.field
+    [:label.label {:for :name} "Name"]
+    [errors-component :name]
+    [:input.input
+     {:type :text
+      :name :name
+      :on-change #(rf/dispatch
+                   [:form/set-field
+                    :name
+                    (.. % -target -value)])
+      :value @(rf/subscribe [:form/field :name])}]]
+   [:div.field
+    [:label.label (:for :message) "Message"]
+    [errors-component :message]
+    [:textarea.textarea
+     {:name :message
+      :value @(rf/subscribe [:form/field :message])
+      :on-change #(rf/dispatch
+                   [:form/set-field
+                    :message
+                    (.. % -target -value)])}]]
+   [:input.button.is-primary
+    {:type :submit
+     :disabled @(rf/subscribe [:form/validation-errors?])
+     :on-click #(rf/dispatch [:message/send!
+                              @(rf/subscribe [:form/fields])])
+     :value "comment"}]])
 
 (defn reload-messages-button []
   (let [loading? (rf/subscribe [:messages/loading?])]
