@@ -14,16 +14,16 @@ generated using Luminus version "3.91"
 ## Backend Development
 
 - To start web services for the application, run:
-    ```
+    ```sh
     lein run
     ```
 
 - Alternatively; Start a REPL...
-    ```
+    ```sh
     lein repl
     ```
     - ... & "(start)" web services for the application.
-        ```sh
+        ```lisp
         nREPL server started on port 37217 on host 127.0.0.1 - nrepl://127.0.0.1:37217
         REPL-y 0.4.4, nREPL 0.8.3
         Clojure 1.10.1
@@ -42,19 +42,19 @@ generated using Luminus version "3.91"
 
 - install dependencies
 
-    ```
+    ```sh
     npm install
     ```
 
 - start shadow-cljs in watch mode
 
-    ```
+    ```sh
     npx shadow-cljs watch app
     ```
 
 - open a shadow-cljs repl
 
-    ```
+    ```sh
     npx shadow-cljs cljs-repl app
     ```
 
