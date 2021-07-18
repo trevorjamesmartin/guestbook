@@ -40,7 +40,8 @@
                  [org.clojure/google-closure-library "0.0-20191016-6ae1f72f"
                   :scope "provided"]
                  [thheller/shadow-cljs "2.11.14" :scope "provided"]
-                 [day8.re-frame/re-frame-10x "1.1.11"]]
+                 [day8.re-frame/re-frame-10x "1.1.11"]
+                 [com.taoensso/sente "1.16.2"]]
 
   :min-lein-version "2.0.0"
 
