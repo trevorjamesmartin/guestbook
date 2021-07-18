@@ -43,7 +43,7 @@ generated using Luminus version "3.91"
 - install dependencies
 
     ```sh
-    npm install
+    yarn install
     ```
 
 - start shadow-cljs in watch mode
