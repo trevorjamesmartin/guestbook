@@ -135,11 +135,6 @@
                :success-path [:messages]
                :success-event [:messages/set]}}))
 
-;; (defn get-messages []
-;;   (GET "/api/messages"
-;;     {:headers {"Accept" "application/transit+json"}
-;;      :handler #(rf/dispatch [:messages/set (:messages %)])}))
-
 (defn message-list [messages]
   (println messages)
   [:ul.messages
@@ -232,10 +227,41 @@
           [:div.columns>div.column
            [message-form]]])])))
 
+(defn navbar []
+  (let [burger-active (r/atom false)]
+    (fn []
+      [:nav.navbar.is-info
+       [:div.container
+        [:div.navbar-brand
+         [:a.navbar-item
+          {:href "/"
+           :style {:font-weight "bold"}}
+          "guestbook"]
+         [:span.navbar-burger.burger
+          {:data-target "nav-menu"
+           :on-click #(swap! burger-active not)
+           :class (when @burger-active "is-active")}
+          [:span]
+          [:span]
+          [:span]]]
+        [:div#nav-menu.navbar-menu
+         {:class (when @burger-active "is-active")}
+         [:div.navbar-start
+          [:a.navbar-item
+           {:href "/"}
+           "Home"]]]]])))
+
+(defn app []
+  [:div.app
+   [navbar]
+   [:section.section
+    [:div.container
+     [home]]]])
+
 (defn ^:dev/after-load mount-components []
   (rf/clear-subscription-cache!)
   (.log js/console "Mounting Components...")
-  (dom/render [#'home] (.getElementById js/document "content"))
+  (dom/render [#'app] (.getElementById js/document "content"))
   (.log js/console "Components Mounted!"))
 
 (defn handle-response! [response]
