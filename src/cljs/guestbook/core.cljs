@@ -261,8 +261,69 @@
 (defn nameplate [{:keys [login]}]
   [:button.button.is-primary
    login])
-
 ;; -- END Login-modal
+
+;; -- START Register-modal --
+(defn register-button []
+  (r/with-let
+   [fields (r/atom {})
+    error (r/atom nil)
+    do-register
+    (fn [_]
+      (reset! error nil)
+      (POST "/api/register"
+        {:headers {"Accept" "application/transit+json"}
+         :params @fields
+         :handler (fn [response]
+                    (reset! fields {})
+                    (rf/dispatch [:app/hide-modal :user/register])
+                    (rf/dispatch [:app/show-modal :user/login]))
+         :error-handler (fn [error-response]
+                          (reset! error
+                                  (or
+                                   (:message (:response error-response))
+                                   (:status-text error-response)
+                                   "Unknown Error")))}))]
+   [modal-button :user/register
+    ;;Title
+    "Create Account"
+    ;;Body
+    [:div
+     (when-not (string/blank? @error)
+       [:div.notifications.is-danger
+        @error])
+     [:div.field
+      [:div.label "Login"]
+      [:div.control
+       [:input.input
+        {:type "text"
+         :value (:login @fields)
+         :on-change #(swap! fields assoc :login (.. % -target -value))}]]]
+     [:div.field
+      [:div.label "Password"]
+      [:div.control
+       [:input.input
+        {:type "password"
+         :value (:password @fields)
+         :on-change #(swap! fields assoc :password (.. % -target -value))}]]]
+     [:div.field
+      [:div.label "Confirm Password"]
+      [:div.control
+       [:input.input
+        {:type "password"
+         :value (:confirm @fields)
+         :on-change #(swap! fields assoc :confirm (.. % -target -value))
+         ;; Submit Registration form when 'Enter' key is pressed
+         :on-key-down #(when (= (.-keyCode %) 13)
+                         (do-register))}]]]]
+     ;;Footer
+    [:button.button.is-primary.is-fullwidth
+     {:on-click do-register
+      :disabled (or (string/blank? (:login @fields))
+                    (string/blank? (:password @fields))
+                    (string/blank? (:confirm @fields)))}
+     "Create Account"]]))
+;; -- END Register-modal --
 
 
 (defn message-list [messages]
@@ -387,7 +448,8 @@
               [nameplate u]
               [logout-button]]
              [:div.buttons
-              [login-button]])]]]]])))
+              [login-button]
+              [register-button]])]]]]])))
 
 (defn app []
   [:div.app
