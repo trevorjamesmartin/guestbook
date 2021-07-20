@@ -26,9 +26,9 @@
    :id id})
 
 (defmethod handle-message :message/create!
-  [{:keys [?data uid] :as message}]
+  [{:keys [?data uid s] :as message}]
   (let [response (try
-                   (msg/save-message! ?data)
+                   (msg/save-message! (:identity s) ?data)
                    (assoc ?data :timestamp (java.util.Date.))
                    (catch Exception e
                      (let [{id :guestbook/error-id
@@ -48,11 +48,15 @@
           (send! uid [:message/add response]))
         {:success true}))))
 
-(defn receive-message! [{:keys [id ?reply-fn]
+(defn receive-message! [{:keys [id ?reply-fn ring-req]
                          :as message}]
   (log/debug "Got message with id: " id)
-  (let [reply-fn (or ?reply-fn (fn [_]))]
-    (when-some [response (handle-message message)]
+  (let [reply-fn (or ?reply-fn (fn [_]))
+        s (session/read-session ring-req)
+        response (-> message
+                     (assoc :session s)
+                     handle-message)]
+    (when response
       (reply-fn response))))
 
 (defstate channel-router
