@@ -5,12 +5,11 @@
    [guestbook.layout :refer [error-page]]
    [ring.middleware.anti-forgery :refer [wrap-anti-forgery]]
    [guestbook.middleware.formats :as formats]
-   [guestbook.session :as session]
    [muuntaja.middleware :refer [wrap-format wrap-params]]
    [guestbook.config :refer [env]]
    [ring-ttl-session.core :refer [ttl-memory-store]]
-   [ring.middleware.defaults :refer [site-defaults wrap-defaults]])
-  )
+   [ring.middleware.defaults :refer [site-defaults wrap-defaults]]
+   [guestbook.session :as session]))
 
 (defn wrap-internal-error [handler]
   (fn [req]

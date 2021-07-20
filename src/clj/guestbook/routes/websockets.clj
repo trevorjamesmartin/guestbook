@@ -2,6 +2,7 @@
   (:require [clojure.tools.logging :as log]
             [guestbook.messages :as msg]
             [guestbook.middleware :as middleware]
+            [guestbook.session :as session]
             [mount.core :refer [defstate]]
             [taoensso.sente :as sente]
             [taoensso.sente.server-adapters.http-kit :refer [get-sch-adapter]]))
@@ -52,9 +53,9 @@
                          :as message}]
   (log/debug "Got message with id: " id)
   (let [reply-fn (or ?reply-fn (fn [_]))
-        s (session/read-session ring-req)
+        session (session/read-session ring-req)
         response (-> message
-                     (assoc :session s)
+                     (assoc :session session)
                      handle-message)]
     (when response
       (reply-fn response))))
