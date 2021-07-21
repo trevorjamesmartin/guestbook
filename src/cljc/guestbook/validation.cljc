@@ -11,4 +11,4 @@
     st/string]])
 
 (defn validate-message [params]
-  (first (st/validate params message-schema)))
+    (first (st/validate params message-schema)))

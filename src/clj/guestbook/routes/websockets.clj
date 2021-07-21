@@ -3,6 +3,8 @@
             [guestbook.messages :as msg]
             [guestbook.middleware :as middleware]
             [guestbook.session :as session]
+            [guestbook.auth :as auth]
+            [guestbook.auth.ws :refer [authorized?]]
             [mount.core :refer [defstate]]
             [taoensso.sente :as sente]
             [taoensso.sente.server-adapters.http-kit :refer [get-sch-adapter]]))
@@ -14,7 +16,7 @@
                          (get-in ring-req [:params :client-id]))}))
 
 (defn send! [uid message]
-  (println "Sending message: " message)
+  (println "Sending message: [" uid "] " message)
   ((:send-fn socket) uid message))
 
 (defmulti handle-message (fn [{:keys [id]}]
@@ -27,9 +29,9 @@
    :id id})
 
 (defmethod handle-message :message/create!
-  [{:keys [?data uid s] :as message}]
+  [{:keys [?data uid session] :as message}]
   (let [response (try
-                   (msg/save-message! (:identity s) ?data)
+                   (msg/save-message! (:identity session) ?data)
                    (assoc ?data :timestamp (java.util.Date.))
                    (catch Exception e
                      (let [{id :guestbook/error-id
@@ -42,7 +44,7 @@
                           {:server-error ["Failed to save message!"]}}))))]
     (if (:errors response)
       (do
-        (log/debug "Failed to save message: " ?data)
+        (log/debug "Failed to save message: " ?data uid session)
         response)
       (do
         (doseq [uid (:any @(:connected-uids socket))]
@@ -51,14 +53,26 @@
 
 (defn receive-message! [{:keys [id ?reply-fn ring-req]
                          :as message}]
-  (log/debug "Got message with id: " id)
-  (let [reply-fn (or ?reply-fn (fn [_]))
-        session (session/read-session ring-req)
-        response (-> message
-                     (assoc :session session)
-                     handle-message)]
-    (when response
-      (reply-fn response))))
+  ;; (log/debug "Got message with id: " id)
+  (case id
+    :chsk/bad-package (log/debug "Bad Package:|n" message)
+    :chsk/bad-event (log/debug "Bad Event:|n" message)
+    :chsk/uidport-open (log/trace (:event message))
+    :chsk/uidport-close (log/trace (:event message))
+    :chsk/ws-ping nil
+    ;; ELSE
+    (let [reply-fn (or ?reply-fn (fn [_]))
+          session (session/read-session ring-req)
+          message (-> message
+                      (assoc :session session))]
+      (log/debug "Got message with id: " id)
+      (if (authorized? auth/roles message)
+        (when-some [response (handle-message message)]
+          (reply-fn response))
+        (do
+          (log/info "Unauthorized message: " id)
+          (reply-fn {:message "You are not authorized to perform this action!"
+                     :errors {:unauthorized true}}))))))
 
 (defstate channel-router
   :start (sente/start-chsk-router!
