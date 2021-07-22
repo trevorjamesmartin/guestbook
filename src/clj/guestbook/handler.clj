@@ -22,8 +22,7 @@
   (middleware/wrap-base
    (ring/ring-handler
     (ring/router
-     [
-      (app-routes)
+     [(app-routes)
       (service-routes)
       (websocket-routes)]
     ;;  {:reitit.middleware/transform dev/print-request-diffs}
