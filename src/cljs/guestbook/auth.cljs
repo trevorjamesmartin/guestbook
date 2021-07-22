@@ -4,7 +4,8 @@
    [reagent.core :as r]
    [re-frame.core :as rf]
    [guestbook.modals :as m]
-   [ajax.core :refer [POST]]))
+   [ajax.core :refer [POST]]
+   [reitit.frontend.easy :as rtfe]))
 
 ;; -- START sessions --
 (rf/reg-event-fx
@@ -112,7 +113,8 @@
    "Log Out"])
 
 (defn nameplate [{:keys [login]}]
-  [:button.button.is-primary
+  [:a.button.is-primary
+   {:href (rtfe/href :guestbook.routes.app/profile)}
    login])
 ;; -- END Login-modal
 
