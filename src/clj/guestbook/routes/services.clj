@@ -15,7 +15,11 @@
    [guestbook.author :as author]
    [clojure.tools.logging :as log]
    [ring.util.http-response :as response]
-   [guestbook.middleware.formats :as formats]))
+   [guestbook.middleware.formats :as formats]
+   [clojure.java.io :as io]
+   [guestbook.db.core :as db]
+   [guestbook.media :as media]))
+
 
 (defn service-routes []
   ["/api"
@@ -96,7 +100,7 @@
            :handler
            (fn [{{{:keys [login]} :path} :parameters}]
              (response/ok (author/get-author login)))}}]
-   
+
    ["/my-account"
     ["/set-profile"
      {::auth/roles (auth/roles :account/set-profile!)
@@ -123,7 +127,30 @@
                    (log/error e)
                    (response/internal-server-error
                     {:errors {:server-error
-                              "Failed to set profile!"}}))))}}]]
+                              "Failed to set profile!"}}))))}}]
+    ["/media/upload"
+     {::auth/roles (auth/roles :media/upload)
+      :post {:parameters {:multipart {:avatar multipart/temp-file-part
+                                      :banner multipart/temp-file-part}}
+             :handler
+             (fn [{{{:keys [avatar banner] :as mp} :multipart} :parameters
+                   {:keys [identity] :as session} :session
+                   :as req}]
+
+               (response/ok {:avatar (str "/api/media/"
+                                          (media/insert-image-returning-name
+                                           (assoc avatar
+                                                  :filename
+                                                  (str (:login identity)
+                                                       "_avatar"))
+                                           {:owner (:login identity)}))
+                             :banner (str "/api/media/"
+                                          (media/insert-image-returning-name
+                                           (assoc banner
+                                                  :filename
+                                                  (str (:login identity)
+                                                       "_banner"))
+                                           {:owner (:login identity)}))}))}}]]
 
    ["/messages"
     {::auth/roles (auth/roles :messages/list)}
@@ -153,6 +180,16 @@
        :handler
        (fn [{{{:keys [author]} :path} :parameters}]
          (response/ok (msg/messages-by-author author)))}}]]
+
+   ["/media/:name"
+    {::auth/roles (auth/roles :media/get)
+     :get {:parameters {:path {:name string?}}
+           :handler (fn [{{{:keys [name]} :path} :parameters}]
+                      (if-let [{:keys [data type]} (db/get-file {:name name})]
+                        (-> (io/input-stream data)
+                            (response/ok)
+                            (response/content-type type))
+                        (response/not-found)))}}]
 
    ["/login"
     {::auth/roles (auth/roles :auth/login)

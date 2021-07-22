@@ -32,4 +32,6 @@
    :account/register #{:any}
    :session/get #{:any}
    :messages/list #{:any}
-   :swagger/swagger #{:any}})
+   :swagger/swagger #{:any}
+   :media/get #{:any}
+   :media/upload #{:authenticated}})
