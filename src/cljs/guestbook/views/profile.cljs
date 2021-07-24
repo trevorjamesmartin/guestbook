@@ -5,6 +5,11 @@
    [re-frame.core :as rf]))
 
 (rf/reg-sub
+ :profile/media
+ (fn [db _]
+   (get db :profile/media)))
+
+(rf/reg-sub
  :profile/changes
  (fn [db _]
    (get db :profile/changes)))
@@ -12,21 +17,32 @@
 (rf/reg-sub
  :profile/changed?
  :<- [:profile/changes]
- (fn [changes _]
-   (seq changes)))
+ :<- [:profile/media]
+ (fn [[changes media] _]
+   (not (and
+         (empty? changes)
+         (empty? media)))))
 
 (rf/reg-sub
  :profile/field-changed?
  :<- [:profile/changes]
- (fn [changes [_ k]]
-   (contains? changes k)))
+ :<- [:profile/media]
+ (fn [[changes media] [_ k]]
+   (or
+    (contains? changes k)
+    (contains? media k))))
 
 (rf/reg-sub
  :profile/field
  :<- [:profile/changes]
  :<- [:auth/user]
- (fn [[changes {:keys [profile]}] [_ k default]]
-   (or (get changes k) (get profile k) default)))
+ :<- [:profile/media]
+ (fn [[changes {:keys [profile]} media] [_ k default]]
+   (or
+    (when-let [file (get media k)] (js/URL.createObjectURL file))
+    (get changes k)
+    (get profile k)
+    default)))
 
 (rf/reg-sub
  :profile/profile
@@ -43,19 +59,40 @@
              #(dissoc % k)
              #(assoc % k v)))))
 
+(rf/reg-event-db
+ :profile/save-media
+ (fn [db [_ k v]]
+   (update db
+           :profile/media
+           (if (nil? v)
+             #(dissoc % k)
+             #(assoc % k v)))))
+
 (rf/reg-event-fx
  :profile/set-profile
- (fn [_ [_ profile]]
-   {:ajax/post {:url "/api/my-account/set-profile"
-                :params {:profile profile}
-                :success-event [:profile/handle-set-profile profile]}}))
+ (fn [_ [_ profile files]]
+   (if (some some? (vals files))
+     {:ajax/upload-media!
+      {:url "/api/my-account/media/upload"
+       :files files
+       :handler
+       (fn [response]
+         (rf/dispatch
+          [:profile/set-profile
+           (merge profile
+                  (select-keys response (:files-uploaded response)))]))}}
+     {:ajax/post {:url "/api/my-account/set-profile"
+                  :params {:profile profile}
+                  :success-event [:profile/handle-set-profile profile]}})))
 
 (rf/reg-event-db
  :profile/handle-set-profile
  (fn [db [_ profile]]
    (-> db
        (assoc-in [:auth/user :profile] profile)
-       (dissoc :profile/changes))))
+       (dissoc 
+        :profile/media
+        :profile/changes))))
 
 (defn display-name []
   (r/with-let

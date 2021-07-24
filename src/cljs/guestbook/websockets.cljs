@@ -55,8 +55,8 @@
   (.log js/console "Unknown websocket message: " (pr-str event)))
 
 (defmethod handle-message :chsk/ws-ping
-  [{:keys [event]} _]
-  (.log js/console "PING"))
+  [{:keys [_]} _]
+  (send! [:chsk/ws-ping])) ;; PING back
 
 ;;-------------------------------
 ;; Router
