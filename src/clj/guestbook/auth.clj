@@ -56,4 +56,5 @@
    :messages/list #{:any}
    :swagger/swagger #{:any}
    :media/get #{:any}
-   :media/upload #{:authenticated}})
+   :media/upload #{:authenticated}
+   :message/get #{:any}})
