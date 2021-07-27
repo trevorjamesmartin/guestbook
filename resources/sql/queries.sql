@@ -68,3 +68,11 @@ WHERE media.owner = :owner
 SELECT * FROM media
 WHERE name = :name
 
+-- :name set-password-for-user!* :! :n
+UPDATE users
+SET password = :password
+WHERE login = :login
+
+-- :name delete-user!* :! :n
+DELETE FROM users
+WHERE login = :login
