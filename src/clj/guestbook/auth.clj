@@ -4,6 +4,18 @@
    [next.jdbc :as jdbc]
    [guestbook.db.core :as db]))
 
+(defn change-password! [login old-password new-password]
+  (jdbc/with-transaction [t-conn db/*db*]
+                         (let [{hashed :password} (db/get-user-for-auth* t-conn {:login login})]
+                           (if (hashers/check old-password hashed)
+                             (db/set-password-for-user!*
+                              t-conn
+                              {:login login
+                               :password (hashers/derive new-password)})
+                             (throw (ex-info "Old password must match!"
+                                             {:guestbook/error-id ::authentication-failure
+                                              :error "Passwords do not match!"}))))))
+
 (defn create-user! [login password]
   (jdbc/with-transaction [t-conn db/*db*]
                          (if-not (empty? (db/get-user-for-auth* t-conn {:login login}))
@@ -13,6 +25,16 @@
                            (db/create-user!* t-conn
                                              {:login login
                                               :password (hashers/derive password)}))))
+
+
+(defn delete-account! [login password]
+  (jdbc/with-transaction [t-conn db/*db*]
+    (let [{hashed :password} (db/get-user-for-auth* t-conn {:login login})]
+      (if (hashers/check password hashed)
+        (db/delete-user!* t-conn {:login login})
+        (throw (ex-info "Password is incorrect!"
+                        {:guestbook/error-id ::authentication-failure
+                         :error "Password is incorrect!"}))))))
 
 (defn authenticate-user [login password]
   (let [{hashed :password :as user} (db/get-user-for-auth* {:login login})]
