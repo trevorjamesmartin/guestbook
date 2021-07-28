@@ -43,7 +43,8 @@
                   :scope "provided"]
                  [thheller/shadow-cljs "2.11.14" :scope "provided"]
                  [day8.re-frame/re-frame-10x "1.1.11"]
-                 [com.taoensso/sente "1.16.2"]]
+                 [com.taoensso/sente "1.16.2"]
+                 [markdown-clj "1.10.5"]]
 
   :min-lein-version "2.0.0"
 

@@ -1,6 +1,9 @@
 (ns guestbook.components
   (:require
-   [reagent.core :as r]))
+   [reagent.core :as r]
+   [clojure.string :as string]
+   [markdown.core :refer [md->html]]
+   [markdown.transformers :refer [transformer-vector]]))
 
 (defn text-input [{val :value
                    attrs :attrs
@@ -59,3 +62,32 @@
                                         (set! "")))}]
    [:span.file-cta
     [:span.file-label label-text]]])
+
+(defn escape-html
+  "Change special characters into HTML character entities."
+  [text state]
+  (if (or (:code state) (:codeblock state))
+    [text state];; don't escape html blocks!
+    [(string/escape text {\& "&amp;"
+                          \< "&lt;"
+                          \> "&gt;"
+                          \" "&quot;"
+                          \' "&#39;"}) 
+     state]))
+
+(def transformers
+  (into [escape-html] transformer-vector))
+
+(defn parse-message [message]
+  (md->html message :replacement-transformers transformers))
+
+(defn md
+  ([content]
+   [md :p {} content])
+  ([tag content]
+   [md :p tag content])
+  ([tag attrs content]
+   [tag (-> attrs
+            (assoc :dangerouslySetInnerHTML
+                   {:__html (parse-message content)})
+            (update :class (fnil conj []) "markdown"))]))

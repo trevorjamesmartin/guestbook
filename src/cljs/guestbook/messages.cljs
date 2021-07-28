@@ -7,7 +7,7 @@
    [re-frame.core :as rf]
    [guestbook.validation :refer [validate-message]]
    [guestbook.components :refer [text-input textarea-input
-                                 image]]))
+                                 image md]]))
 
 (rf/reg-event-fx
  :messages/load
@@ -64,27 +64,32 @@
        "Loading Messages"
        "Refresh Messages")]))
 
-(defn message [{:keys [id timestamp message name author avatar] :as m}]
+(defn message 
+  ([m] [message m {}])
+  ([{:keys [id timestamp message name author avatar] :as m}
+    {:keys [include-link?]
+     :or {include-link? true}}]
   [:article.media
    [:figure.media-left
     [image (or avatar "/img/avatar-default.png") 128 128]]
    [:div.media-content>div.content
     [:time (.toLocaleString timestamp)]
-    [:p message]
-    [:p>a
-     {:on-click (fn [_]
-                  (let [{{:keys [name]} :data
-                         {:keys [path query]} :parameters}
-                        @(rf/subscribe [:router/current-route])]
-                    (rtfe/replace-state name path (assoc query :post id)))
-                  (rtfe/push-state :guestbook.routes.app/post {:post id}))}
-     "View Post"]
+    [md message]
+    (when include-link?
+      [:p>a {:on-click
+             (fn [_]
+               (let [{{:keys [name]} :data
+                      {:keys [path query]} :parameters}
+                     @(rf/subscribe [:router/current-route])]
+                 (rtfe/replace-state name path (assoc query :post id)))
+               (rtfe/push-state :guestbook.routes.app/post {:post id}))}
+       "View Post"])
     [:p " - " name
      " <"
      (if author
        [:a {:href (str "/user/" author)} (str "@" author)]
        [:span.is-italic "account not found"])
-     ">"]]])
+     ">"]]]))
 
 (defn msg-li [m message-id]
   (r/create-class
