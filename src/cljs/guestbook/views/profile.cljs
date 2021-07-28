@@ -265,7 +265,7 @@
         [:div.field-label-is-normal>label.label {:for :login} "Login"]
         [:div.field-body>input.input
          {:id :login
-          :autocomplete false
+          :autoComplete false
           :value @login
           :on-change #(reset! login (.. % -target -value))
           :disabled (:loading @status)
@@ -278,7 +278,7 @@
           :disabled (:loading @status)
           :on-change #(reset! password (.. % -target -value))
           :type :password
-          :autocomplete false}]]]
+          :autoComplete false}]]]
       ;; Modal footer
       [:div.field.is-grouped
        [:p.control>button.button.is-light
