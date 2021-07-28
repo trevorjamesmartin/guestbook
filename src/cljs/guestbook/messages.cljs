@@ -213,24 +213,52 @@
                                    message
                                    (string/join error))]))
 
+(defn message-preview [m]
+  (r/with-let [expanded (r/atom false)]
+    [:<>
+     [:button.button.is-secondary.is-fullwidth
+      {:on-click #(swap! expanded not)}
+      (if @expanded
+        "Hide Preview"
+        "Show Preview")]
+     (when @expanded
+       [:ul.messages
+        {:style
+         {:margin-left 0}}
+        [:li
+         [message m
+          {:include-link? false}]]])]))
+
 (defn message-form []
-  [:div
-   [errors-component :server-error]
-   [errors-component :unauthorized "Please log in before posting"]
-   [:div.field
-    [:label.label {:for :name} "Name"]
-    (let [{:keys [login profile]} @(rf/subscribe [:auth/user])]
-      (:display-name profile login))]
-   [:div.field
-    [:label.label (:for :message) "Message"]
-    [errors-component :message]
-    [textarea-input
-     {:attrs {:name :message}
-      :value (rf/subscribe [:form/field :message])
-      :on-save #(rf/dispatch [:form/set-field :message %])}]]
-   [:input.button.is-primary
-    {:type :submit
-     :disabled @(rf/subscribe [:form/validation-errors?])
-     :on-click #(rf/dispatch [:message/send!
-                              @(rf/subscribe [:form/fields])])
-     :value "comment"}]])
+  [:div.card
+   [:div.card-header>p.card-header-title
+    "Post Something!"]
+   (let [{:keys [login profile]} @(rf/subscribe [:auth/user])
+         display-name (:display-name profile login)]
+     [:div.card-content
+      [message-preview {:message @(rf/subscribe [:form/field :message])
+                        :id -1
+                        :timestamp (js/Date.)
+                        :name display-name
+                        :author login
+                        :avatar (:avatar profile)}]
+      [errors-component :server-error]
+      [errors-component :unauthorized "Please log in before posting"]
+      [:div.field
+       [:label.label {:for :name} "Name"]
+       display-name]
+      [:div.field
+       [:label.label (:for :message) "Message"]
+       [errors-component :message]
+       [textarea-input
+        {:attrs {:name :message}
+         :save-timeout 1000 ;; refresh preview after 1s without edits
+         :value (rf/subscribe [:form/field :message])
+         :on-save #(rf/dispatch [:form/set-field :message %])}]]
+      [:input.button.is-primary.is-fullwidth
+       {:type :submit
+        :disabled @(rf/subscribe [:form/validation-errors?])
+        :on-click #(rf/dispatch [:message/send!
+                                 @(rf/subscribe [:form/fields])])
+        :value "comment"}]])
+])
