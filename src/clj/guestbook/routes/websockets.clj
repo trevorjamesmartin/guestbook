@@ -1,5 +1,6 @@
 (ns guestbook.routes.websockets
   (:require [clojure.tools.logging :as log]
+            [clojure.pprint :refer [pprint]]
             [guestbook.messages :as msg]
             [guestbook.middleware :as middleware]
             [guestbook.session :as session]
@@ -16,7 +17,7 @@
                          (get-in ring-req [:params :client-id]))}))
 
 (defn send! [uid message]
-  (println "Sending message: [" uid "] " message)
+  (pprint {:uid uid :send! message})
   ((:send-fn socket) uid message))
 
 (defmulti handle-message (fn [{:keys [id]}]
@@ -51,9 +52,28 @@
           (send! uid [:message/add response]))
         {:success true}))))
 
+(defmethod handle-message :message/boost!
+  [{:keys [?data uid session] :as message}]
+  (let [response (try
+                   (msg/boost-message (:identity session)
+                                      (:id ?data)
+                                      (:poster ?data))
+                   (catch Exception e
+                     {:errors
+                      {:server-error ["Failed to boost message!"]}}))]
+    (if (:errors response)
+      (do
+        (log/debug "Failed to boost message: " ?data)
+        response)
+      (do
+        (doseq [uid (:any @(:connected-uids socket))]
+          (send! uid [:message/add response]))
+        {:success true}))))
+
+
 (defn receive-message! [{:keys [id ?reply-fn ring-req]
                          :as message}]
-  ;; (log/debug "Got message with id: " id)
+  (log/debug "Got message with id: " id)
   (case id
     :chsk/bad-package (log/debug "Bad Package:|n" message)
     :chsk/bad-event (log/debug "Bad Event:|n" message)

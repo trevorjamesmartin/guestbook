@@ -106,31 +106,31 @@
    ["/my-account"
     ["/delete-account"
      {::auth/roles (auth/roles :account/set-profile!)
-     :post
-     {:parameters
-      {:body {:login string?
-              :password string?}}
-      :handler
-      (fn [{{{:keys [login password]} :body} :parameters
-            {{user :login} :identity} :session
-            :as req}]
-        (if (not= login user)
-          (response/bad-request
-           {:message "Login must match the current user!"})
-          (try
-            (auth/delete-account! user password)
-            (-> (response/ok)
-                (assoc :session
-                       (select-keys
-                        (:session req)
-                        [:ring.middleware.anti-forgery/anti-forgery-token])))
-            (catch clojure.lang.ExceptionInfo e
-              (if (= (:guestbook/error-id (ex-data e))
-                     ::auth/authentication-failure)
-                (response/unauthorized
-                 {:error :incorrect-password
-                  :message "Password is incorrect, please try again!"})
-                (throw e))))))}}]
+      :post
+      {:parameters
+       {:body {:login string?
+               :password string?}}
+       :handler
+       (fn [{{{:keys [login password]} :body} :parameters
+             {{user :login} :identity} :session
+             :as req}]
+         (if (not= login user)
+           (response/bad-request
+            {:message "Login must match the current user!"})
+           (try
+             (auth/delete-account! user password)
+             (-> (response/ok)
+                 (assoc :session
+                        (select-keys
+                         (:session req)
+                         [:ring.middleware.anti-forgery/anti-forgery-token])))
+             (catch clojure.lang.ExceptionInfo e
+               (if (= (:guestbook/error-id (ex-data e))
+                      ::auth/authentication-failure)
+                 (response/unauthorized
+                  {:error :incorrect-password
+                   :message "Password is incorrect, please try again!"})
+                 (throw e))))))}}]
     ["/set-profile"
      {::auth/roles (auth/roles :account/set-profile!)
       :post {:parameters
@@ -215,7 +215,8 @@
            mp)))}}]]
 
    ["/messages"
-    {::auth/roles (auth/roles :messages/list)}
+    {::auth/roles (auth/roles :messages/list)
+     :parameters {:query {(ds/opt :boosts) boolean?}}}
     ["" {:get
          {:responses
           {200
@@ -228,8 +229,12 @@
                :author (ds/maybe string?)
                :avatar (ds/maybe string?)}]}}}
           :handler
-          (fn [_]
-            (response/ok (msg/message-list)))}}]
+          (fn [{{{:keys [boosts]
+                  :or {boosts true}} :query} :parameters}]
+            (response/ok
+             (if boosts
+               (msg/timeline)
+               (msg/message-list))))}}]
     ["/by/:author"
      {:get
       {:parameters {:path {:author string?}}
@@ -244,8 +249,12 @@
             :author (ds/maybe string?)
             :avatar (ds/maybe string?)}]}}}
        :handler
-       (fn [{{{:keys [author]} :path} :parameters}]
-         (response/ok (msg/messages-by-author author)))}}]]
+       (fn [{{{:keys [author]} :path
+              {:keys [boosts] :or {boosts true}} :query} :parameters}]
+         (response/ok
+          (if boosts
+            (msg/timeline-for-poster author)
+            (msg/messages-by-author author))))}}]]
 
    ["/media/:name"
     {::auth/roles (auth/roles :media/get)
@@ -328,54 +337,75 @@
    ["/message"
     ["/:post-id"
      {::auth/roles (auth/roles :message/get)
-      :get {:parameters
-            {:path
-             {:post-id pos-int?}}
-
-            :responses
-            {200 {:body {:message map?}}
+      :get
+      {:parameters
+       {:path
+        {:post-id pos-int?}}
+       :responses
+       {200 {:body {:message map?}}
 
              ;; author blocked you
-             403 {:body {:message string?}}
+        403 {:body {:message string?}}
              ;; not found
-             404 {:body {:message string?}}
+        404 {:body {:message string?}}
              ;; unknown error
-             500 {:body {:message string?}}}
-
-            :handler
-            (fn [{{{:keys [post-id]} :path} :parameters}]
-              (if-some [post (msg/get-message post-id)]
-                (response/ok
-                 {:message post})
-                (response/not-found
-                 {:message "Post Not Found"})))}}]
-    [""
-     {::auth/roles (auth/roles :message/create!)
-      :post
-      {:parameters
-       {:body ;; Data Spec for Request body parameters
-        {:message string?}}
-       :responses
-       {200
-        {:body map?}
-        400
-        {:body map?}
-        500
-        {:errors map?}}
+        500 {:body {:message string?}}}
        :handler
-       (fn [{{params :body} :parameters
-             {:keys [identity]} :session}]
-         (try
-           (->> (msg/save-message! identity params)
-                (assoc {:status :ok} :post)
-                (response/ok))
-           (catch Exception e
-             (let [{id :guestbook/error-id
-                    errors :errors} (ex-data e)]
-               (case id
-                 :validation
-                 (response/bad-request {:errors errors})
+       (fn [{{{:keys [post-id]} :path} :parameters}]
+         (if-some [post (msg/get-message post-id)]
+           (response/ok
+            {:message post})
+           (response/not-found
+            {:message "Post Not Found"})))}}
+     [""
+      {::auth/roles (auth/roles :message/create!)
+       :post
+       {:parameters
+        {:body ;; Data Spec for Request body parameters
+         {:message string?}}
+        :responses
+        {200
+         {:body map?}
+         400
+         {:body map?}
+         500
+         {:errors map?}}
+        :handler
+        (fn [{{params :body} :parameters
+              {:keys [identity]} :session}]
+          (try
+            (->> (msg/save-message! identity params)
+                 (assoc {:status :ok} :post)
+                 (response/ok))
+            (catch Exception e
+              (let [{id :guestbook/error-id
+                     errors :errors} (ex-data e)]
+                (case id
+                  :validation
+                  (response/bad-request {:errors errors})
                ;;else
-                 (response/internal-server-error
-                  {:errors
-                   {:server-error ["Failed to save message!"]}}))))))}}]]])
+                  (response/internal-server-error
+                   {:errors
+                    {:server-error ["Failed to save message!"]}}))))))}}]
+     ["/boost"
+      {::auth/roles (auth/roles :message/boost!)
+       :post
+       {:parameters
+        {:body {:poster (ds/maybe string?)}}
+        :responses
+        {200 {:body map?}
+         400 {:body string?}}
+        :handler
+        (fn [{{{:keys [post-id]} :path
+               {:keys [poster]} :body} :parameters
+              {:keys [identity]} :session}]
+          (try
+            (let [post (msg/boost-message identity post-id poster)]
+              (response/ok {:status :ok
+                            :post post}))
+            (catch Exception e
+              (response/bad-request
+               {:message
+                (str "Could not boost message: " post-id
+                     " as " (:login identity))}))))}}]]]
+   ])

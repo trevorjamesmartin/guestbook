@@ -57,4 +57,5 @@
    :swagger/swagger #{:any}
    :media/get #{:any}
    :media/upload #{:authenticated}
-   :message/get #{:any}})
+   :message/get #{:any}
+   :message/boost! #{:authenticated}})
