@@ -9,6 +9,12 @@
    [guestbook.components :refer [text-input textarea-input
                                  image md image-uploader]]))
 
+(rf/reg-event-fx
+ :message/boost!
+ (fn [{:keys [db]} [_ message]]
+   {:ws/send!
+    {:message [:message/boost! (select-keys message [:id :poster])]}}))
+
 (rf/reg-event-db
  :message/save-media
  (fn [db [_ img]]
@@ -154,8 +160,7 @@
              "open_in_new"]])
          [:button.button.is-rounded.is-small.is-info.is-outlined.level-item
           {:on-click
-           (fn [_]
-             (rf/dispatch [:message/boost! m]))
+           #(rf/dispatch [:message/boost! m])
            :disabled (nil? @(rf/subscribe [:auth/user]))}
           "♻ " boosts]]]]])))
 
