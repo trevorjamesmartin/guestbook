@@ -171,3 +171,18 @@ SELECT * FROM posts_with_meta
                               INNER JOIN parents pp
                                       ON p.id = pp.parent)
               SELECT id from parents)
+
+-- :name get-feed-for-tag :? :*
+-- :require [guestbook.db.util :refer [tag-regex]]
+-- :doc Given a tag, return its feed
+SELECT * FROM
+(SELECT DISTINCT ON (p.id) * FROM posts_and_boosts as p
+  WHERE
+  /*~ (if (:tag params) */
+  p.message ~*
+  /*~*/
+  false
+  /*~ ) ~*/
+  --~ (when (:tag params) (tag-regex (:tag params)))
+  ORDER BY p.id, posted_at desc) as t
+ORDER BY t.posted_at asc

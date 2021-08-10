@@ -35,6 +35,9 @@
   (print "POST ID " post-id)
   (db/get-message {:id post-id}))
 
+(defn get-feed-for-tag [tag]
+  {:messages
+   (db/get-feed-for-tag {:tag tag})})
 
 (defn boost-message [{{:keys [display-name]} :profile
                       :keys [login]} post-id poster]
