@@ -3,7 +3,8 @@
    [re-frame.core :as rf]
    [reagent.core :as r]
    [cljs.pprint :refer [pprint]]
-   [guestbook.messages :as msg]))
+   [guestbook.messages :as msg]
+   [reagent.dom :as dom]))
 
 
 (defn clear-post-keys [db]
@@ -154,21 +155,89 @@
  (fn [db [_ id]]
    (contains? (::expanded-posts db) id)))
 
+(rf/reg-event-db
+ ::add-message
+ (fn [db [_ post-id {:keys [root_id messages]}]]
+   (if (= post-id root_id)
+     (let [parent-id (:id (second messages))]
+       (if (= parent-id post-id)
+         (update-in db [::post :reply_count] inc)
+         (update db ::posts
+                 #(if (contains? % parent-id)
+                    (update-in % [parent-id :reply_count] inc)
+                    %))))
+     db)))
+
+(rf/reg-event-fx
+ ::fetch-parents
+ (fn [{:keys [db]} [_ post-id]]
+   {:ajax/get {:url (str "/api/message/" post-id "/parents")
+               :success-path [:parents]
+               :success-event [::add-parents post-id]}}))
+
+(defn add-post-to-db [db {:keys [id parent] :as post}]
+  (-> db
+      (assoc-in [::posts id] post)
+      (update-in [::replies parent]
+                 #(if (some (partial = id) %)
+                    %
+                    (conj % id)))
+      (assoc-in [::replies-status id] :success)
+      (update ::expanded-posts (fnil conj #{}) id)))
+
+(rf/reg-event-db
+ ::add-parents
+ (fn [db [_ post-id parents]]
+   (reduce add-post-to-db db parents)))
+
 (def post-controllers
   [{:parameters {:path [:post]}
     :start (fn [{{:keys [post]} :path}]
+             (rf/dispatch [:ws/set-message-add-handler [::add-message post]])
              (rf/dispatch [::fetch-post post])
              (rf/dispatch [::fetch-replies post]))
     :stop (fn [_]
+            (rf/dispatch [:ws/set-message-add-handler nil])
             (rf/dispatch [::collapse-all])
             (rf/dispatch [::clear-post])
-            (rf/dispatch [::clear-replies]))}])
+            (rf/dispatch [::clear-replies]))}
+   {:parameters {:query [:reply]}
+    :start (fn [{{:keys [reply]} :query}]
+             (when reply
+               (rf/dispatch [::set-scroll-to reply])
+               (rf/dispatch [::fetch-parents reply])))
+    :stop (fn [_]
+            (rf/dispatch [::set-scroll-to nil]))
+    }
+   ])
 
 (defn loading-bar []
   [:progress.progress.is-dark {:max 100} "30%"])
 
+(rf/reg-event-db
+ ::set-scroll-to
+ (fn [db [_ id]]
+   (if (nil? id)
+     (dissoc db ::scroll-to-post)
+     (assoc db ::scroll-to-post id))))
+
+(rf/reg-sub
+ ::scroll?
+ (fn [db [_ id]]
+   (= id (::scroll-to-post db))))
+
 (defn reply [post-id]
-  [msg/message @(rf/subscribe [::reply post-id]) {:include-link? false}])
+  (r/create-class
+   {:component-did-mount
+    (fn [this]
+      (when @(rf/subscribe [::scroll? post-id])
+        (rf/dispatch [::set-scroll-to nil])
+        (.scrollIntoView (dom/dom-node this))))
+    :reagent-render
+    (fn [_]
+      [msg/message
+       @(rf/subscribe [::reply post-id])
+       {:include-link? false}])}))
 
 (defn expand-control [post-id]
   (let [expanded? @(rf/subscribe [::post-expanded? post-id])
