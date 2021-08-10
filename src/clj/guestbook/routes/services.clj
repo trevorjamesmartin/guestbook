@@ -299,7 +299,6 @@
               (->
                (response/ok)
                (assoc :session nil)))}}]
-
    ["/register"
     {::auth/roles (auth/roles :account/register)
      :post {:parameters
@@ -360,6 +359,7 @@
                   {:message "Post Not Found"})))}}
       ;
       ]
+
      ["/replies"
       {::auth/roles (auth/roles :message/get)
        :get {:handler (fn [{{{:keys [post-id]} :path} :parameters}]
@@ -367,6 +367,14 @@
                           (response/ok
                            {:replies
                             replies})))}}]
+     ["/parents"
+      {::auth/roles (auth/roles :message/get)
+       :get {:handler (fn [{{{:keys [post-id]} :path} :parameters}]
+                        (let [parents (msg/get-parents post-id)]
+                          (response/ok
+                           {:parents
+                            parents})))}}]
+
      ["/boost"
       {::auth/roles (auth/roles :message/boost!)
        :post {:parameters {:body {:poster (ds/maybe string?)}}
@@ -387,7 +395,7 @@
                       (str "Could not boost message: " post-id
                            " as " (:login identity))}))))}}]]
     ;
-    
+
     [""
      {::auth/roles (auth/roles :message/create!)
       :post
