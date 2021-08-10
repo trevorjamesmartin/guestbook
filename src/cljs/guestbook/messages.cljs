@@ -143,7 +143,9 @@
              {:keys [path query]} :parameters}
             @(rf/subscribe [:router/current-route])]
         (rtfe/replace-state name path (assoc query :post id)))
-      (rtfe/push-state :guestbook.routes.app/post {:post root_id}))}
+      (rtfe/push-state :guestbook.routes.app/post {:post root_id}
+                       (when (not= root_id id)
+                         {:reply id})))}
    [:i.material-icons
     "open_in_new"]])
 
