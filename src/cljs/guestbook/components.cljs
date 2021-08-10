@@ -123,7 +123,7 @@
   ([content]
    [md :p {} content])
   ([tag content]
-   [md :p tag content])
+   [md tag {} content])
   ([tag attrs content]
    [tag (-> attrs
             (assoc :dangerouslySetInnerHTML

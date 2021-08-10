@@ -1,8 +1,8 @@
 -- :name save-message! :! :n
 -- :doc create a new message using the name and message keys
 INSERT INTO posts
-(author, name, message)
-VALUES (:author, :name, :message)
+(author, name, message, parent)
+VALUES (:author, :name, :message, :parent)
 RETURNING *;
 
 -- :name get-messages :? :*
@@ -12,8 +12,18 @@ SELECT * FROM posts_with_meta
 -- :name get-message :? :1
 -- :doc selects a message
 SELECT * FROM posts_with_meta
-WHERE id = :id
+              INNER JOIN (SELECT id, parent from posts) as p using (id)
+              INNER JOIN reply_count using (id)
+  WHERE id = :id
 
+-- :name get-replies :? :*
+-- :doc get the replies for a post
+SELECT * FROM posts_with_meta
+              INNER JOIN (SELECT id, parent from posts) as p using (id)
+              INNER JOIN reply_count using (id)
+  WHERE id IN (select id from posts
+                where parent = :id)
+                
 -- :name get-messages-by-author :? :*
 -- :doc selects all messages posted by a user
 SELECT * FROM posts_with_meta
@@ -147,3 +157,4 @@ AND poster = :user
 AND id = :post
 ORDER BY posted_at asc
 LIMIT 1
+

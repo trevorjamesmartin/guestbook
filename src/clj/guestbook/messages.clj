@@ -14,14 +14,25 @@
     (throw (ex-info "Message is invalid"
                     {:guestbook/error-id :validation
                      :errors errors}))
-    (db/save-message! (assoc message
-                             :author login
-                             :name (or display-name login)))))
+    (let [tags (map second
+                    (re-seq #"(?<=\s|^)#([-\w]+)(?=\s|$)"
+                            (:message message)))]
+      (conman/with-transaction [db/*db*]
+        (let [post-id (:id
+                       (db/save-message! db/*db*
+                                         (assoc message
+                                                :author login
+                                                :name (or display-name login)
+                                                :parent (:parent message))))]
+          (db/get-timeline-post db/*db* {:post post-id
+                                         :user login
+                                         :is_boost false}))))))
 
 (defn messages-by-author [author]
   {:messages (vec (db/get-messages-by-author {:author author}))})
 
 (defn get-message [post-id]
+  (print "POST ID " post-id)
   (db/get-message {:id post-id}))
 
 
@@ -41,3 +52,5 @@
 (defn timeline-for-poster [poster]
   {:messages (vec (db/get-timeline-for-poster {:poster poster}))})
 
+(defn get-replies [id]
+  (db/get-replies {:id id}))

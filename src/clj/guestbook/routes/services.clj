@@ -360,6 +360,13 @@
                   {:message "Post Not Found"})))}}
       ;
       ]
+     ["/replies"
+      {::auth/roles (auth/roles :message/get)
+       :get {:handler (fn [{{{:keys [post-id]} :path} :parameters}]
+                        (let [replies (msg/get-replies post-id)]
+                          (response/ok
+                           {:replies
+                            replies})))}}]
      ["/boost"
       {::auth/roles (auth/roles :message/boost!)
        :post {:parameters {:body {:poster (ds/maybe string?)}}
@@ -380,12 +387,14 @@
                       (str "Could not boost message: " post-id
                            " as " (:login identity))}))))}}]]
     ;
+    
     [""
      {::auth/roles (auth/roles :message/create!)
       :post
       {:parameters
        {:body ;; Data Spec for Request body parameters
-        {:message string?}}
+        {:message string?
+         (ds/opt :parent) (ds/maybe int?)}}
 
        :responses
        {200

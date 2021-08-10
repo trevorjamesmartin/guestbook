@@ -10,6 +10,69 @@
   (dissoc db ::error ::post))
 
 (rf/reg-event-fx
+ ::fetch-replies
+ (fn [{:keys [db]} [_ post-id]]
+   {:db (assoc-in db [::replies-status post-id] :loading)
+    :ajax/get {:url (str "/api/message/" post-id "/replies")
+               :success-path [:replies]
+               :success-event [::add-replies post-id]
+               :error-event [::set-replies-error post-id]}}))
+
+(rf/reg-event-db
+ ::add-replies
+ (fn [db [_ post-id replies]]
+   (-> db
+       (update ::posts (fnil into {}) (map (juxt :id identity)) replies)
+       (assoc-in [::replies post-id] (map :id replies))
+       (assoc-in [::replies-status post-id] :success))))
+(rf/reg-event-db
+ ::set-replies-error
+ (fn [db [_ post-id response]]
+   (-> db
+       (assoc-in [::replies-status post-id] response))))
+
+(rf/reg-event-db
+ ::clear-replies
+ (fn [db _]
+   (dissoc db ::posts ::replies ::replies-status)))
+
+(rf/reg-sub
+ ::posts
+ (fn [db _]
+   (assoc
+    (::posts db)
+    (::id (::post db))
+    (::post db))))
+
+(rf/reg-sub
+ ::reply
+ :<- [::posts]
+ (fn [posts [_ id]]
+   (get posts id)))
+
+(rf/reg-sub
+ ::replies-map
+ (fn [db _]
+   (::replies db)))
+
+(rf/reg-sub
+ ::replies-for-post
+ :<- [::replies-map]
+ (fn [replies [_ id]]
+   (get replies id)))
+
+(rf/reg-sub
+ ::replies-status-map
+ (fn [db _]
+   (::replies-status db)))
+
+(rf/reg-sub
+ ::replies-status
+ :<- [::replies-status-map]
+ (fn [statuses [_ id]]
+   (get statuses id)))
+
+(rf/reg-event-fx
  ::fetch-post
  (fn [{:keys [db]} [_ post-id]]
    {:db (clear-post-keys db)
@@ -50,17 +113,115 @@
  (fn [[post error] _]
    (and (empty? post) (empty? error))))
 
+(rf/reg-sub
+ ::reply-count
+ (fn [[_ id] _]
+   (rf/subscribe [::reply id]))
+ (fn [post _]
+   (:reply_count post)))
+
+(rf/reg-sub
+ ::has-replies?
+ (fn [[_ id] _]
+   (rf/subscribe [::reply-count id]))
+ (fn [c _]
+   (not= c 0)))
+
+(rf/reg-sub
+ ::replies-to-load
+ (fn [[_ id] _]
+   [(rf/subscribe [::reply-count id]) (rf/subscribe [::replies-for-post id])])
+ (fn [[c replies] _]
+   (- c (count replies))))
+
+(rf/reg-event-db
+ ::expand-post
+ (fn [db [_ id]]
+   (update db ::expanded-posts (fnil conj #{}) id)))
+
+(rf/reg-event-db
+ ::collapse-post
+ (fn [db [_ id]]
+   (update db ::expanded-posts (fnil disj #{}) id)))
+
+(rf/reg-event-db
+ ::collapse-all
+ (fn [db [_ id]]
+   (dissoc db ::expanded-posts)))
+
+(rf/reg-sub
+ ::post-expanded?
+ (fn [db [_ id]]
+   (contains? (::expanded-posts db) id)))
+
 (def post-controllers
   [{:parameters {:path [:post]}
     :start (fn [{{:keys [post]} :path}]
-             (rf/dispatch [::fetch-post post]))
+             (rf/dispatch [::fetch-post post])
+             (rf/dispatch [::fetch-replies post]))
     :stop (fn [_]
-            (rf/dispatch [::clear-post]))}])
+            (rf/dispatch [::collapse-all])
+            (rf/dispatch [::clear-post])
+            (rf/dispatch [::clear-replies]))}])
 
 (defn loading-bar []
   [:progress.progress.is-dark {:max 100} "30%"])
 
-(defn post [{:keys [name author message timestamp avatar] :as post-content}]
+(defn reply [post-id]
+  [msg/message @(rf/subscribe [::reply post-id]) {:include-link? false}])
+
+(defn expand-control [post-id]
+  (let [expanded? @(rf/subscribe [::post-expanded? post-id])
+        reply-count @(rf/subscribe [::reply-count post-id])
+        replies-to-load @(rf/subscribe [::replies-to-load post-id])
+        loaded? (= replies-to-load 0)
+        status @(rf/subscribe [::replies-status post-id])]
+    [:div.field.has-addons
+     [:p.control>span.button.is-static reply-count " replies"]
+     [:p.control>button.button
+      {:on-click (fn []
+                   (if expanded?
+                     (rf/dispatch [::collapse-post post-id])
+                     (do
+                       (when-not loaded?
+                         (rf/dispatch [::fetch-replies post-id]))
+                       (rf/dispatch [::expand-post post-id]))))
+       :disabled (= status :loading)}
+      (str (if expanded? "-" "+"))]
+     (when expanded?
+       [:p.control>button.button
+        {:on-click #(rf/dispatch [::fetch-replies post-id])
+         :disabled (= status :loading)}
+        (if loaded?
+          "↻"
+          (str "Load " replies-to-load " New Replies"))])]))
+
+(defn reply-tree [post-id]
+  (when @(rf/subscribe [::has-replies? post-id])
+    (let [status @(rf/subscribe [::replies-status post-id])]
+      [:<>
+       [expand-control post-id]
+       (case status
+         nil nil
+         :success
+         (when @(rf/subscribe [::post-expanded? post-id])
+           [:div
+            {:style {:border-left "1px dotted blue"
+                     :padding-left "10px"}}
+            (doall
+             (for [id @(rf/subscribe [::replies-for-post post-id])]
+               ^{:key id}
+               [:<>
+                [reply id]
+                [reply-tree id]]))])
+         :loading [loading-bar]
+      ;; ELSE
+         [:div
+          [:h3 "Error"]
+          [:pre (with-out-str (pprint status))]])])))
+
+(defn post [{:keys [name author message timestamp avatar id]
+             :as post-content}]
   [:div.content
    [:button.button.is-info.is-outlined.is-fullwidth
     {:on-click #(.back js/window.history)}
@@ -69,7 +230,8 @@
     "<" [:a {:href (str "/user/" author)} (str "@" author)]
     ">"]
    [:h4.subtitle.is-4 "Posted at " (.toLocaleString timestamp)]
-   [msg/message post-content]])
+   [msg/message post-content {:include-link? false}]
+   [reply-tree id]])
 
 (defn post-page [_]
   (let [post-content @(rf/subscribe [::post])
