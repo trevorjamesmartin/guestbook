@@ -234,6 +234,27 @@
             (response/ok (if boosts
                            (msg/timeline)
                            (msg/message-list))))}}]
+    ["/feed"
+     {::auth/roles (auth/roles :messages/feed)
+      :get
+      {:responses
+       {200
+        {:body ;; Data spec for body
+         {:messages
+          [{:id pos-int?
+            :name string?
+            :message string?
+            :timestamp inst?
+            :author (ds/maybe string?)
+            :avatar (ds/maybe string?)}]}}}
+       :handler
+       (fn [{{{:keys [boosts]
+               :or {boosts true}} :query} :parameters
+             {{{:keys [subscriptions]} :profile} :identity} :session}]
+         (if boosts
+           (response/ok
+            (msg/get-feed subscriptions))
+           (response/not-implemented {:message "Feed ony supports boosts."})))}}]
     ["/tagged/:tag"
      {:get
       {:parameters {:path {:tag string?}}

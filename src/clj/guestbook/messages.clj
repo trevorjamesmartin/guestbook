@@ -14,19 +14,19 @@
     (throw (ex-info "Message is invalid"
                     {:guestbook/error-id :validation
                      :errors errors}))
-    (let [tags (map second
-                    (re-seq #"(?<=\s|^)#([-\w]+)(?=\s|$)"
-                            (:message message)))]
-      (conman/with-transaction [db/*db*]
-        (let [post-id (:id
-                       (db/save-message! db/*db*
-                                         (assoc message
-                                                :author login
-                                                :name (or display-name login)
-                                                :parent (:parent message))))]
-          (db/get-timeline-post db/*db* {:post post-id
-                                         :user login
-                                         :is_boost false}))))))
+   (let [tags (map second
+                   (re-seq #"(?<=\s|^)#([-\w]+)(?=\s|$)"
+                           (:message message)))]
+     (conman/with-transaction [db/*db*]
+       (let [post-id (:id
+                      (db/save-message! db/*db*
+                                        (assoc message
+                                               :author login
+                                               :name (or display-name login)
+                                               :parent (:parent message))))]
+         (db/get-timeline-post db/*db* {:post post-id
+                                        :user login
+                                        :is_boost false}))))))
 
 (defn messages-by-author [author]
   {:messages (vec (db/get-messages-by-author {:author author}))})
@@ -60,3 +60,15 @@
 
 (defn get-parents [id]
   (db/get-parents {:id id}))
+
+(defn get-feed [feed-map]
+  (when-not (every? #(re-matches #"[-\w]+" %) (:tags feed-map))
+    (throw
+     (ex-info
+      "Tags must only contain alphanumeric characters, dashes, or underscores!"
+      feed-map)))
+  {:messages
+   (db/get-feed (merge {:follows []
+                        :tags []}
+                       feed-map))})
+

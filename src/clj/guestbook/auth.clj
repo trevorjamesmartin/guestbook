@@ -58,4 +58,5 @@
    :media/get #{:any}
    :media/upload #{:authenticated}
    :message/get #{:any}
-   :message/boost! #{:authenticated}})
+   :message/boost! #{:authenticated}
+   :messages/feed #{:authenticated}})

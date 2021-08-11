@@ -186,3 +186,24 @@ SELECT * FROM
   --~ (when (:tag params) (tag-regex (:tag params)))
   ORDER BY p.id, posted_at desc) as t
 ORDER BY t.posted_at asc
+
+-- :name get-feed :? :*
+-- :require [guestbook.db.util :refer [tags-regex]]
+-- :doc Given a vector of follows, and a vector of tags, return a feed
+SELECT * FROM
+(SELECT DISTINCT ON (p.id) * FROM posts_and_boosts as p
+  WHERE
+  /*~ (if (seq (:follows params)) */
+  p.poster IN (:v*:follows)
+  /*~*/
+  false
+  /*~ ) ~*/
+  or
+  /*~ (if (seq (:tags params)) */
+  p.message ~*
+  /*~*/
+  false
+  /*~ ) ~*/
+  --~ (when (seq (:tags params)) (tags-regex (:tags params)))
+  ORDER BY p.id, posted_at desc) as t
+ORDER BY t.posted_at asc
